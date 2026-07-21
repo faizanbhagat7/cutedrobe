@@ -269,11 +269,11 @@ export default function Home() {
 
         {tab === 'home' && (
           <section className="rise pt-16 text-center">
-            <div className="mb-4 text-[12px] uppercase tracking-[.34em] text-[var(--taupe)]">a wardrobe that knows her</div>
-            <h1 className="font-display text-[clamp(46px,7.5vw,84px)] font-medium leading-[1.02]">Dressed in <span className="italic text-[var(--rose)]">petals</span>,<br />styled by heart.</h1>
-            <p className="mx-auto mt-6 max-w-[520px] text-[16.5px] leading-relaxed text-[var(--cocoa)]">Snap an outfit, and it&apos;s cut out and catalogued — real photos of every look she owns, sorted and re-styled.</p>
+            <div className="mb-4 text-[12px] uppercase tracking-[.34em] text-[var(--gold)]">a wardrobe worthy of her</div>
+            <h1 className="font-display text-[clamp(46px,7.5vw,84px)] font-medium leading-[1.02]">Curated in <span className="italic text-[var(--wine)]">gold</span>,<br />styled by heart.</h1>
+            <p className="mx-auto mt-6 max-w-[520px] text-[16.5px] leading-relaxed text-[var(--taupe)]">Every look she owns — photographed, refined, and remembered. A private atelier that dresses her beautifully, every day.</p>
             <div className="card-shadow-lg mx-auto mt-10 flex max-w-[640px] items-center gap-5 rounded-3xl border border-[rgba(217,199,169,.4)] bg-[rgba(255,253,249,.8)] px-8 py-6 text-left backdrop-blur-md">
-              <div className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full text-2xl" style={{ background: 'radial-gradient(circle at 32% 28%, var(--blush), var(--rose))' }}>🌸</div>
+              <div className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full text-2xl" style={{ background: 'linear-gradient(135deg, var(--gold-soft), var(--wine))' }}><span className="font-display text-[22px] italic text-white">S</span></div>
               <div>
                 <h3 className="font-display text-[20px] font-semibold">{greet}</h3>
                 <p className="text-[14.5px] leading-snug text-[var(--cocoa)]">{negFirst ? `Your ${negFirst.name.toLowerCase()} ${negFirst.last_worn ? `hasn't been out since ${negFirst.last_worn}` : 'is waiting for its first outing'} — shall we style it today?` : 'Upload her first outfit photo to begin 📸'}</p>

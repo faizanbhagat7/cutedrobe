@@ -1,16 +1,41 @@
 @import "tailwindcss";
 
 :root {
-  --cream:#F7F1E8; --beige:#E8DCC8; --sand:#D9C7A9; --taupe:#A98F6F;
-  --cocoa:#6B5138; --ink:#3E3226; --blush:#E9C9BC; --rose:#C98D77; --paper:#FFFDF9;
+  /* Royal / elegant palette */
+  --bg:#F4EFE9;          /* warm ivory base */
+  --paper:#FBF8F3;       /* card surface */
+  --champagne:#EBE1D2;   /* soft champagne */
+  --sand:#D8C7A8;        /* muted gold-sand */
+  --gold:#B08D4F;        /* antique gold accent */
+  --gold-soft:#C9A86A;
+  --taupe:#8C7A63;       /* muted text */
+  --plum:#3A2233;        /* deep aubergine (primary dark) */
+  --plum-soft:#5A3A50;
+  --wine:#7A3B4E;        /* accent wine */
+  --ink:#2A2029;         /* near-black text */
+  /* legacy aliases so existing class names keep working */
+  --cream:var(--bg); --beige:var(--champagne); --cocoa:var(--plum);
+  --blush:#E7D3C0; --rose:var(--gold);
 }
 html { scroll-behavior:smooth }
-body { background:var(--cream); color:var(--ink); font-family:'Jost', sans-serif; font-weight:300 }
-.font-display { font-family:'Cormorant Garamond', serif }
-.card-shadow { box-shadow:0 8px 24px -10px rgba(107,81,56,.22) }
-.card-shadow-lg { box-shadow:0 18px 50px -18px rgba(107,81,56,.28) }
+body {
+  color:var(--ink);
+  font-family:'Jost', sans-serif;
+  font-weight:300;
+  background:
+    radial-gradient(1200px 600px at 15% -10%, #EFE6D8 0%, transparent 60%),
+    radial-gradient(1000px 700px at 100% 0%, #EAD9DE 0%, transparent 55%),
+    linear-gradient(180deg, #F4EFE9 0%, #EFE7DC 100%);
+  background-attachment:fixed;
+  min-height:100vh;
+}
+.font-display { font-family:'Cormorant Garamond', serif; letter-spacing:.005em }
+.card-shadow { box-shadow:0 10px 30px -14px rgba(58,34,51,.20) }
+.card-shadow-lg { box-shadow:0 26px 60px -22px rgba(58,34,51,.30) }
+/* thin gold hairline used on cards / dividers */
+.gold-line { background:linear-gradient(90deg, transparent, var(--gold-soft), transparent) }
 @keyframes rise { from {opacity:0; transform:translateY(18px)} to {opacity:1; transform:none} }
-.rise { animation: rise .55s cubic-bezier(.22,1,.36,1) }
+.rise { animation: rise .6s cubic-bezier(.22,1,.36,1) }
 @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:.35} }
-.live-dot::before { content:''; width:7px; height:7px; border-radius:9999px; background:#7BA05B; display:inline-block; margin-right:6px; animation:pulse2 2s infinite }
+.live-dot::before { content:''; width:7px; height:7px; border-radius:9999px; background:var(--gold); display:inline-block; margin-right:6px; animation:pulse2 2s infinite }
 @media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important} }
