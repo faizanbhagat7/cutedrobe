@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root {
+  --cream:#F7F1E8; --beige:#E8DCC8; --sand:#D9C7A9; --taupe:#A98F6F;
+  --cocoa:#6B5138; --ink:#3E3226; --blush:#E9C9BC; --rose:#C98D77; --paper:#FFFDF9;
+}
+html { scroll-behavior:smooth }
+body { background:var(--cream); color:var(--ink); font-family:'Jost', sans-serif; font-weight:300 }
+.font-display { font-family:'Cormorant Garamond', serif }
+.card-shadow { box-shadow:0 8px 24px -10px rgba(107,81,56,.22) }
+.card-shadow-lg { box-shadow:0 18px 50px -18px rgba(107,81,56,.28) }
+@keyframes rise { from {opacity:0; transform:translateY(18px)} to {opacity:1; transform:none} }
+.rise { animation: rise .55s cubic-bezier(.22,1,.36,1) }
+@keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:.35} }
+.live-dot::before { content:''; width:7px; height:7px; border-radius:9999px; background:#7BA05B; display:inline-block; margin-right:6px; animation:pulse2 2s infinite }
+@media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important} }
