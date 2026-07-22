@@ -230,7 +230,7 @@ export default function Home() {
         <div className="absolute left-3 top-3 z-10 rounded-full bg-[rgba(58,34,51,.72)] px-2.5 py-1 text-[9.5px] uppercase tracking-[.18em] text-[var(--sand)] backdrop-blur-sm">favourite</div>
       )}
       {w.image_url
-        ? <div className="h-[230px] bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${w.image_url})`, background: `#F6F1E9 url(${w.image_url}) center/contain no-repeat` }} />
+        ? <div className="h-[230px] w-full" style={{ background: '#F6F1E9', backgroundImage: `url(${w.image_url})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />
         : <div className="flex h-[230px] items-center justify-center bg-[#F6F1E9] font-display text-[40px] italic text-[var(--sand)]">{w.category[0]}</div>}
       <div className="h-px w-full gold-line opacity-50" />
       <div className="px-5 py-4">

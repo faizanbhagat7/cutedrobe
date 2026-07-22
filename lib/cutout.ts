@@ -1,45 +1,36 @@
-/* Refined outfit-cutout pipeline.
-   Goals: precise edges, no watermark, and uniform, gallery-grade cards.
+/* Outfit cut-out pipeline — precision-first.
 
-   Stages:
-   1. downscale huge phone photos (speed, without losing edge detail)
-   2. segment with the high-accuracy isnet model (free, local, watermark-free)
-   3. clean the alpha edge (kills the faded halo / semi-transparent fringe)
-   4. auto-trim empty space, centre, and pad onto a square canvas
-   5. export a crisp PNG at a consistent size
+   Design rule: NEVER destroy garment pixels. Earlier versions used an
+   aggressive alpha floor (0.42) plus despeckling, which erased soft fabric
+   edges and light garments — that is what produced "half the outfit".
+   This version only removes what is confidently background, and every
+   destructive step has a guard that reverts if it removed too much.
 */
 
 export type CutoutOptions = {
-  /** final square canvas size in px */
   size?: number
-  /** padding inside the canvas, as a fraction of size */
   padding?: number
-  /** alpha below this is erased; above `solidAt` is made fully opaque */
-  alphaFloor?: number
-  solidAt?: number
   onStage?: (stage: 'preparing' | 'segmenting' | 'refining' | 'framing') => void
 }
 
-const DEFAULTS: Required<Omit<CutoutOptions, 'onStage'>> = {
-  size: 1200,
-  padding: 0.06,
-  alphaFloor: 0.42,
-  solidAt: 0.88,
-}
+const SIZE = 1400
+const PADDING = 0.05
+/** Only pixels below this are treated as background. Deliberately low. */
+const CLEAR_BELOW = 0.06
+/** Pixels above this are snapped to fully opaque (kills grey haze). */
+const SOLID_ABOVE = 0.92
+/** Ignore alpha under this when measuring the subject's bounds. */
+const BOUNDS_ALPHA = 24
 
-/** Load a File/Blob into an ImageBitmap (fast, no DOM). */
-async function toBitmap(src: Blob): Promise<ImageBitmap> {
-  return await createImageBitmap(src)
-}
+async function bitmap(src: Blob) { return await createImageBitmap(src) }
 
-/** Downscale very large images so segmentation stays fast and sharp. */
-async function prepare(file: File, maxEdge = 1600): Promise<Blob> {
-  const bmp = await toBitmap(file)
+/** Downscale huge phone photos; keeps segmentation fast without losing detail. */
+async function prepare(file: File, maxEdge = 1800): Promise<Blob> {
+  const bmp = await bitmap(file)
   const longest = Math.max(bmp.width, bmp.height)
   if (longest <= maxEdge) { bmp.close(); return file }
   const scale = maxEdge / longest
-  const w = Math.round(bmp.width * scale)
-  const h = Math.round(bmp.height * scale)
+  const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale)
   const c = new OffscreenCanvas(w, h)
   const ctx = c.getContext('2d')!
   ctx.imageSmoothingEnabled = true
@@ -49,50 +40,35 @@ async function prepare(file: File, maxEdge = 1600): Promise<Blob> {
   return await c.convertToBlob({ type: 'image/png' })
 }
 
+/** How much of the image is visible (0-1). Used as a safety measure. */
+function coverage(data: Uint8ClampedArray): number {
+  let on = 0
+  const px = data.length / 4
+  for (let i = 3; i < data.length; i += 4) if (data[i] > BOUNDS_ALPHA) on++
+  return on / px
+}
+
 /**
- * Clean the alpha channel.
- * The "half the outfit fades away" problem is semi-transparent fringe pixels.
- * We push low alpha to 0 and high alpha to 255, then keep a narrow ramp
- * between so edges stay smooth instead of jagged.
+ * Gentle alpha clean-up: clears only near-zero alpha (true background haze)
+ * and solidifies near-opaque pixels. Everything in between is LEFT ALONE so
+ * soft fabric edges survive intact.
  */
-function refineAlpha(data: Uint8ClampedArray, floor: number, solid: number) {
-  const lo = floor * 255
-  const hi = solid * 255
+function cleanAlpha(data: Uint8ClampedArray) {
+  const lo = CLEAR_BELOW * 255, hi = SOLID_ABOVE * 255
   for (let i = 3; i < data.length; i += 4) {
     const a = data[i]
-    if (a <= lo) { data[i] = 0; continue }
-    if (a >= hi) { data[i] = 255; continue }
-    // smoothstep across the remaining band
-    const t = (a - lo) / (hi - lo)
-    data[i] = Math.round(255 * (t * t * (3 - 2 * t)))
+    if (a <= lo) data[i] = 0
+    else if (a >= hi) data[i] = 255
   }
 }
 
-/** Remove isolated specks left behind by segmentation. */
-function despeckle(data: Uint8ClampedArray, w: number, h: number) {
-  const alpha = new Uint8ClampedArray(w * h)
-  for (let p = 0; p < w * h; p++) alpha[p] = data[p * 4 + 3]
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const p = y * w + x
-      if (!alpha[p]) continue
-      let neighbours = 0
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          if (!dx && !dy) continue
-          if (alpha[p + dy * w + dx] > 8) neighbours++
-        }
-      if (neighbours <= 2) data[p * 4 + 3] = 0
-    }
-  }
-}
-
-/** Find the bounding box of everything still visible. */
+/** Bounding box of the subject. */
 function boundsOf(data: Uint8ClampedArray, w: number, h: number) {
   let minX = w, minY = h, maxX = -1, maxY = -1
   for (let y = 0; y < h; y++) {
+    const row = y * w
     for (let x = 0; x < w; x++) {
-      if (data[(y * w + x) * 4 + 3] > 10) {
+      if (data[(row + x) * 4 + 3] > BOUNDS_ALPHA) {
         if (x < minX) minX = x
         if (x > maxX) maxX = x
         if (y < minY) minY = y
@@ -104,45 +80,65 @@ function boundsOf(data: Uint8ClampedArray, w: number, h: number) {
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 }
 }
 
-/**
- * Turn a raw cut-out into a uniform, gallery-grade image:
- * trimmed of empty space, centred, padded, on a square transparent canvas.
- * This is what makes every card in the closet line up beautifully.
- */
-async function frame(cut: Blob, size: number, padding: number, alphaFloor: number, solidAt: number): Promise<Blob> {
-  const bmp = await toBitmap(cut)
+/** Trim, centre and pad onto a square canvas — with guards against bad crops. */
+async function frame(cut: Blob, size: number, padding: number): Promise<Blob> {
+  const bmp = await bitmap(cut)
   const work = new OffscreenCanvas(bmp.width, bmp.height)
   const wctx = work.getContext('2d')!
   wctx.drawImage(bmp, 0, 0)
   bmp.close()
 
   const img = wctx.getImageData(0, 0, work.width, work.height)
-  refineAlpha(img.data, alphaFloor, solidAt)
-  despeckle(img.data, work.width, work.height)
-  wctx.putImageData(img, 0, 0)
+  const before = coverage(img.data)
+  cleanAlpha(img.data)
+  const after = coverage(img.data)
 
-  const box = boundsOf(img.data, work.width, work.height) ?? { x: 0, y: 0, w: work.width, h: work.height }
+  // GUARD 1: if clean-up removed more than 8% of the subject, discard it
+  // and keep the raw segmentation instead. Precision over prettiness.
+  if (before > 0 && after < before * 0.92) {
+    wctx.drawImage(await bitmap(cut), 0, 0)
+  } else {
+    wctx.putImageData(img, 0, 0)
+  }
+
+  const live = wctx.getImageData(0, 0, work.width, work.height)
+  let box = boundsOf(live.data, work.width, work.height)
+
+  // GUARD 2: reject nonsense bounding boxes (tiny, or a sliver) — these are
+  // the classic "cropped in half" symptom. Fall back to the full frame.
+  if (box) {
+    const areaRatio = (box.w * box.h) / (work.width * work.height)
+    const aspect = box.w / box.h
+    if (areaRatio < 0.02 || aspect > 12 || aspect < 1 / 12) box = null
+  }
+  if (!box) box = { x: 0, y: 0, w: work.width, h: work.height }
+
+  // GUARD 3: never crop tighter than the subject — expand slightly so no
+  // edge pixel is ever clipped.
+  const bleed = Math.round(Math.max(box.w, box.h) * 0.01)
+  box = {
+    x: Math.max(0, box.x - bleed),
+    y: Math.max(0, box.y - bleed),
+    w: Math.min(work.width - Math.max(0, box.x - bleed), box.w + bleed * 2),
+    h: Math.min(work.height - Math.max(0, box.y - bleed), box.h + bleed * 2),
+  }
 
   const out = new OffscreenCanvas(size, size)
   const octx = out.getContext('2d')!
   octx.imageSmoothingEnabled = true
   octx.imageSmoothingQuality = 'high'
-
   const inner = size * (1 - padding * 2)
+  // contain: the whole subject always fits, never cropped
   const scale = Math.min(inner / box.w, inner / box.h)
-  const dw = box.w * scale
-  const dh = box.h * scale
+  const dw = box.w * scale, dh = box.h * scale
   octx.drawImage(work, box.x, box.y, box.w, box.h, (size - dw) / 2, (size - dh) / 2, dw, dh)
-
   return await out.convertToBlob({ type: 'image/png' })
 }
 
-/**
- * Main entry: photo in, refined outfit cut-out out.
- * Uses the local isnet model — high accuracy, free, and no watermark.
- */
+/** Photo in → precise, framed outfit cut-out out. */
 export async function refineOutfit(file: File, opts: CutoutOptions = {}): Promise<Blob> {
-  const o = { ...DEFAULTS, ...opts }
+  const size = opts.size ?? SIZE
+  const padding = opts.padding ?? PADDING
   const stage = opts.onStage ?? (() => {})
 
   stage('preparing')
@@ -151,12 +147,17 @@ export async function refineOutfit(file: File, opts: CutoutOptions = {}): Promis
   stage('segmenting')
   const { removeBackground } = await import('@imgly/background-removal')
   const cut = await removeBackground(prepped, {
-    // isnet is the high-accuracy model — noticeably better edges on clothing
     model: 'isnet',
     output: { format: 'image/png', quality: 1 },
   })
 
   stage('refining')
   stage('framing')
-  return await frame(cut, o.size, o.padding, o.alphaFloor, o.solidAt)
+  try {
+    return await frame(cut, size, padding)
+  } catch {
+    // GUARD 4: if framing fails for any reason, return the raw cut-out
+    // rather than a broken image.
+    return cut
+  }
 }
