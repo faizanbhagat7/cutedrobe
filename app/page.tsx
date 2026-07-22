@@ -13,10 +13,12 @@ const CUTE_SAVE = [
   'Tucked into her closet, neat as a bow 🎀', 'Folded with love and put away 🌸',
   'One more treasure for the collection ✨', 'Hung up and looking lovely 🧺', 'Saved — she has wonderful taste 💛',
 ]
-const CUTE_PROCESS = [
-  'Snipping away the background…', 'Pressing out the little wrinkles…', 'Smoothing the seams…',
-  'Dusting off the lint…', 'Finding the perfect hanger…', 'Catching the light just right…',
-]
+const STAGE_LABEL: Record<string, string> = {
+  preparing: 'Preparing the photograph',
+  segmenting: 'Lifting the garment',
+  refining: 'Refining every edge',
+  framing: 'Framing it beautifully',
+}
 const CUTE_TIPS = [
   '“When in doubt, add a belt.” — every grandmother, ever',
   'A silk scarf turns plain into parisienne.',
@@ -79,6 +81,7 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
   const [phase, setPhase] = useState<'' | 'cutting' | 'uploading'>('')
+  const [stage, setStage] = useState<'preparing' | 'segmenting' | 'refining' | 'framing'>('preparing')
   const [tick, setTick] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
   const busy = phase !== ''
@@ -88,7 +91,7 @@ export default function Home() {
     const id = setInterval(() => setTick((t) => t + 1), 2300)
     return () => clearInterval(id)
   }, [busy])
-  const procMsg = CUTE_PROCESS[tick % CUTE_PROCESS.length]
+  
   const tipMsg = CUTE_TIPS[tick % CUTE_TIPS.length]
 
   const pickFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)) }
@@ -97,18 +100,10 @@ export default function Home() {
     if (!form.name.trim()) { toast('Give the outfit a name ✏️'); return }
     try {
       setPhase('cutting'); setTick(0)
-      let cutout: Blob
-      try {
-        // 1) Photoroom (fashion-tuned, clean edges) — key stays server-side
-        const fd = new FormData(); fd.append('image', file)
-        const res = await fetch('/api/cutout', { method: 'POST', body: fd })
-        if (!res.ok) throw new Error('photoroom')
-        cutout = await res.blob()
-      } catch {
-        // 2) fallback: in-browser cutter if Photoroom is unreachable / out of credits
-        const { removeBackground } = await import('@imgly/background-removal')
-        cutout = await removeBackground(file)
-      }
+      // Refined local pipeline: high-accuracy segmentation, edge clean-up,
+      // auto-trim + centre + pad. Free, precise, and watermark-free.
+      const { refineOutfit } = await import('@/lib/cutout')
+      const cutout = await refineOutfit(file, { onStage: (s) => setStage(s) })
       setPhase('uploading')
       const path = `items/${Date.now()}.png`
       const { error: upErr } = await supabase.storage.from('wardrobe').upload(path, cutout, { contentType: 'image/png' })
@@ -239,11 +234,21 @@ export default function Home() {
       <Petals />
       {/* full-screen cute loader while the AI works */}
       {busy && (
-        <div className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-[rgba(247,241,232,.92)] backdrop-blur-sm px-8 text-center">
-          <div className="mb-6 h-12 w-12 animate-spin rounded-full border-[3px] border-[var(--sand)] border-t-[var(--rose)]" />
-          <div className="font-display text-[24px] font-semibold text-[var(--cocoa)]">{procMsg}</div>
-          <div className="mt-3 max-w-[420px] text-[14px] italic leading-relaxed text-[var(--taupe)]">{tipMsg}</div>
-          {phase === 'cutting' && <div className="mt-5 text-[12px] text-[var(--taupe)]">tailoring the perfect cut-out — just a moment 🌸</div>}
+        <div className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-[rgba(244,239,233,.94)] px-8 text-center backdrop-blur-md">
+          <div className="mb-8 h-14 w-14 animate-spin rounded-full border border-[var(--sand)] border-t-[var(--gold)]" style={{ borderWidth: 1.5 }} />
+          <div className="font-display text-[26px] font-medium tracking-wide text-[var(--plum)]">
+            {phase === 'uploading' ? 'Placing it in her closet' : STAGE_LABEL[stage]}
+          </div>
+          <div className="mt-5 flex items-center gap-2">
+            {(['preparing', 'segmenting', 'refining', 'framing'] as const).map((s, i) => {
+              const order = ['preparing', 'segmenting', 'refining', 'framing']
+              const done = phase === 'uploading' || order.indexOf(stage) > i
+              const now = phase === 'cutting' && stage === s
+              return <span key={s} className="h-[2px] w-10 rounded-full transition-all duration-500"
+                style={{ background: done ? 'var(--gold)' : now ? 'var(--gold-soft)' : 'var(--sand)', opacity: done || now ? 1 : .4 }} />
+            })}
+          </div>
+          <div className="mt-8 max-w-[430px] font-display text-[15px] italic leading-relaxed text-[var(--taupe)]">{tipMsg}</div>
         </div>
       )}
 
