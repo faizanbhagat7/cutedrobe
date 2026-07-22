@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { supabase, Cloth, ItemStat, WearEntry, Outfit } from '@/lib/supabase'
+import { advice, suggestion, buildCtx } from '@/lib/advice'
 
 const Petals = dynamic(() => import('@/components/Petals'), { ssr: false })
 
@@ -19,17 +20,6 @@ const STAGE_LABEL: Record<string, string> = {
   refining: 'Refining every edge',
   framing: 'Framing it beautifully',
 }
-const CUTE_TIPS = [
-  '“When in doubt, add a belt.” — every grandmother, ever',
-  'A silk scarf turns plain into parisienne.',
-  'Neutrals never argue — beige loves everyone.',
-  'One statement piece, everything else kept quiet.',
-  'Cuff the jeans, tuck the blouse — instantly put-together.',
-  'A little pearl earring fixes almost anything.',
-  'Match your shoes to your bag and no one asks questions.',
-  'Iron the collar even if nothing else — it shows, darling.',
-  'Good posture is the finest accessory of all.',
-]
 const rand = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]
 
 type Tab = 'home' | 'closet' | 'outfits' | 'stylist' | 'journal' | 'insights'
@@ -68,6 +58,12 @@ export default function Home() {
 
   const statFor = (id: string) => stats.find((s) => s.id === id) || ({ wear_count: 0, last_worn: null } as ItemStat)
 
+  /* live context for the dynamic advice engine */
+  const adviceCtx = useMemo(() => buildCtx({ items: wardrobe, stats, allCategories: CATS }), [wardrobe, stats])
+  const [shuffle, setShuffle] = useState(0)
+  useEffect(() => { const id = setInterval(() => setShuffle((n) => n + 1), 20000); return () => clearInterval(id) }, [])
+  const homeLine = useMemo(() => suggestion(adviceCtx), [adviceCtx, shuffle])
+
   /* ---- closet ---- */
   const [filter, setFilter] = useState('All')
   const [search, setSearch] = useState('')
@@ -92,7 +88,7 @@ export default function Home() {
     return () => clearInterval(id)
   }, [busy])
   
-  const tipMsg = CUTE_TIPS[tick % CUTE_TIPS.length]
+  const tipMsg = useMemo(() => advice(adviceCtx), [tick, adviceCtx])
 
   const pickFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)) }
   const addItem = async () => {
@@ -186,7 +182,7 @@ export default function Home() {
       return neg.length ? `Waiting patiently: ${neg.map((n) => n.name).join(', ')}. Rotate one in this week 🍂` : 'Nothing neglected — beautifully rotated closet!'
     }
     if (q.includes('outfit') || q.includes('look') || q.includes('combo') || q.includes('generate')) return 'Open the Outfits tab and tap “Generate a new outfit with AI” — I pair by rotation and freshness.'
-    if (q.includes('tip') || q.includes('advice') || q.includes('style')) return rand(CUTE_TIPS)
+    if (q.includes('tip') || q.includes('advice') || q.includes('style')) return advice(adviceCtx)
     if (q.includes('pack') || q.includes('trip') || q.includes('travel')) return 'Capsule rule: every top must pair with every bottom you pack. Keep the palette tight for 6+ looks.'
     if (q.includes('hi') || q.includes('hello') || q.includes('hey')) return 'Hello lovely 🌸 your closet is right in front of me — ask away.'
     return `I can see all ${wardrobe.length} pieces in your closet — ask me to style one, find neglected items, or plan a trip 💭`
@@ -213,17 +209,35 @@ export default function Home() {
   const capCls = 'text-[13px] uppercase tracking-[.2em] text-[var(--taupe)]'
 
   const card = (w: Cloth) => (
-    <div key={w.id} className="card-shadow relative overflow-hidden rounded-3xl border border-[rgba(217,199,169,.35)] bg-[var(--paper)] transition-all hover:-translate-y-1.5">
-      <button onClick={() => toggleFav(w.id, !w.is_favorite)} className="absolute right-3.5 top-3.5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[rgba(255,253,249,.9)] transition-transform hover:scale-110">{w.is_favorite ? '🩷' : '🤍'}</button>
-      <button onClick={() => archive(w.id, w.name)} title="Remove" className="absolute right-3.5 top-14 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[rgba(255,253,249,.9)] opacity-0 transition-all hover:scale-110 group-hover:opacity-100">🗑️</button>
+    <div key={w.id} className="group card-shadow relative overflow-hidden rounded-2xl border border-[rgba(216,199,168,.5)] bg-[var(--paper)] transition-all duration-500 hover:-translate-y-1.5 hover:card-shadow-lg">
+      {/* actions */}
+      <div className="absolute right-3 top-3 z-10 flex flex-col gap-2">
+        <button onClick={() => toggleFav(w.id, !w.is_favorite)} title={w.is_favorite ? 'Remove from favourites' : 'Add to favourites'}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(216,199,168,.7)] bg-[rgba(251,248,243,.94)] text-[var(--gold)] shadow-sm backdrop-blur-sm transition-all hover:border-[var(--gold)] hover:bg-white">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill={w.is_favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6">
+            <path d="M12 21s-7.5-4.9-9.5-9A5.3 5.3 0 0 1 12 6.5 5.3 5.3 0 0 1 21.5 12c-2 4.1-9.5 9-9.5 9z" />
+          </svg>
+        </button>
+        <button onClick={() => archive(w.id, w.name)} title="Remove from closet"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(216,199,168,.7)] bg-[rgba(251,248,243,.94)] text-[var(--taupe)] shadow-sm backdrop-blur-sm transition-all hover:border-[var(--wine)] hover:bg-white hover:text-[var(--wine)]">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3" />
+          </svg>
+        </button>
+      </div>
+      {/* favourite marker, always visible but discreet */}
+      {w.is_favorite && (
+        <div className="absolute left-3 top-3 z-10 rounded-full bg-[rgba(58,34,51,.72)] px-2.5 py-1 text-[9.5px] uppercase tracking-[.18em] text-[var(--sand)] backdrop-blur-sm">favourite</div>
+      )}
       {w.image_url
-        ? <div className="h-[210px] bg-[#EFE7D8] bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${w.image_url})` }} />
-        : <div className="flex h-[210px] items-center justify-center bg-[#EFE7D8] text-[54px]">{EMOJI[w.category] || '🧺'}</div>}
+        ? <div className="h-[230px] bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${w.image_url})`, background: `#F6F1E9 url(${w.image_url}) center/contain no-repeat` }} />
+        : <div className="flex h-[230px] items-center justify-center bg-[#F6F1E9] font-display text-[40px] italic text-[var(--sand)]">{w.category[0]}</div>}
+      <div className="h-px w-full gold-line opacity-50" />
       <div className="px-5 py-4">
-        <h4 className="font-display text-[19px] font-semibold leading-tight">{w.name}</h4>
-        <div className="mt-2 flex items-center justify-between">
-          <span className="text-[12.5px] text-[var(--taupe)]">{statFor(w.id).wear_count} wears</span>
-          {w.is_favorite && <span className="text-[11px] uppercase tracking-wider text-[var(--rose)]">loved</span>}
+        <h4 className="font-display text-[19px] font-medium leading-tight text-[var(--plum)]">{w.name}</h4>
+        <div className="mt-1.5 flex items-center justify-between">
+          <span className="text-[10.5px] uppercase tracking-[.2em] text-[var(--gold)]">{w.category}</span>
+          <span className="text-[11.5px] text-[var(--taupe)]">{statFor(w.id).wear_count === 0 ? 'unworn' : `${statFor(w.id).wear_count} wears`}</span>
         </div>
       </div>
     </div>
@@ -281,7 +295,7 @@ export default function Home() {
               <div className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full text-2xl" style={{ background: 'linear-gradient(135deg, var(--gold-soft), var(--wine))' }}><span className="font-display text-[22px] italic text-white">S</span></div>
               <div>
                 <h3 className="font-display text-[20px] font-semibold">{greet}</h3>
-                <p className="text-[14.5px] leading-snug text-[var(--cocoa)]">{negFirst ? `Your ${negFirst.name.toLowerCase()} ${negFirst.last_worn ? `hasn't been out since ${negFirst.last_worn}` : 'is waiting for its first outing'} — shall we style it today?` : 'Upload her first outfit photo to begin 📸'}</p>
+                <p className="text-[14.5px] leading-snug text-[var(--cocoa)]">{wardrobe.length ? homeLine : 'Add her first outfit to begin.'}</p>
               </div>
             </div>
           </section>
@@ -373,7 +387,7 @@ export default function Home() {
                     <div className="mt-1 text-[13px] text-[var(--taupe)]">{o.outfit_items.map((i) => i.clothes?.name).filter(Boolean).join(' + ')}</div>
                     <div className="mt-3 flex gap-2">
                       <button onClick={() => wearOutfit(o)} className="flex-1 rounded-full bg-[var(--cocoa)] py-2 text-[12px] uppercase tracking-wider text-[var(--cream)] transition-colors hover:bg-[var(--rose)]">Wear today</button>
-                      <button onClick={() => deleteOutfit(o.id)} className="rounded-full border border-[var(--sand)] px-3 py-2 text-[13px] opacity-0 transition-all hover:border-[var(--rose)] group-hover:opacity-100">🗑️</button>
+                      <button onClick={() => deleteOutfit(o.id)} title="Delete outfit" className="flex items-center justify-center rounded-full border border-[rgba(216,199,168,.8)] px-3.5 text-[var(--taupe)] transition-all hover:border-[var(--wine)] hover:text-[var(--wine)]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3" /></svg></button>
                     </div>
                   </div>
                 </div>
