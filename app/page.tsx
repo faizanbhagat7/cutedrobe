@@ -32,6 +32,7 @@ export default function Home() {
   const [outfits, setOutfits] = useState<Outfit[]>([])
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [toastMsg, setToastMsg] = useState('')
+  const [ask, setAsk] = useState<{ title: string; body: string; confirm: string; run: () => void } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const toast = useCallback((m: string) => {
@@ -118,10 +119,16 @@ export default function Home() {
     const { error } = await supabase.from('clothes').update({ is_favorite: val }).eq('id', id)
     if (error) toast('Update failed: ' + error.message); else loadAll()
   }
-  const archive = async (id: string, name: string) => {
-    if (!confirm(`Remove "${name}"? (history is kept)`)) return
-    const { error } = await supabase.from('clothes').update({ archived: true }).eq('id', id)
-    if (error) toast('Failed: ' + error.message); else { toast('Gently set aside ☁️'); loadAll() }
+  const archive = (id: string, name: string) => {
+    setAsk({
+      title: 'Remove this piece?',
+      body: `“${name}” will be taken out of her closet. Its history is kept.`,
+      confirm: 'Remove',
+      run: async () => {
+        const { error } = await supabase.from('clothes').update({ archived: true }).eq('id', id)
+        if (error) toast('Could not remove — ' + error.message); else { toast('Quietly set aside.'); loadAll() }
+      },
+    })
   }
 
   /* ---- outfits + AI generator ---- */
@@ -160,10 +167,16 @@ export default function Home() {
     const { error } = await supabase.from('wear_history').insert({ outfit_id: o.id, occasion: 'everyday' })
     if (error) toast('Failed: ' + error.message); else { toast('Noted — worn today & remembered 💾'); loadAll() }
   }
-  const deleteOutfit = async (id: string) => {
-    if (!confirm('Delete this outfit?')) return
-    const { error } = await supabase.from('outfits').delete().eq('id', id)
-    if (error) toast('Failed: ' + error.message); else { toast('Outfit tidied away'); loadAll() }
+  const deleteOutfit = (id: string) => {
+    setAsk({
+      title: 'Delete this look?',
+      body: 'The pairing will be removed. The individual pieces stay in her closet.',
+      confirm: 'Delete',
+      run: async () => {
+        const { error } = await supabase.from('outfits').delete().eq('id', id)
+        if (error) toast('Could not delete — ' + error.message); else { toast('Look removed.'); loadAll() }
+      },
+    })
   }
 
   /* ---- stylist ---- */
@@ -468,7 +481,39 @@ export default function Home() {
         )}
       </div>
 
-      <div className={`fixed bottom-6 left-1/2 z-[95] -translate-x-1/2 rounded-full bg-[var(--cocoa)] px-6 py-3 text-[14px] text-[var(--cream)] shadow-xl transition-transform duration-500 ${toastMsg ? 'translate-y-0' : 'translate-y-24'}`}>{toastMsg || '‎'}</div>
+      {/* premium toast */}
+      <div className={`pointer-events-none fixed bottom-8 left-1/2 z-[95] -translate-x-1/2 transition-all duration-700 ${toastMsg ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'}`}>
+        <div className="flex items-center gap-3 rounded-full border border-[rgba(216,199,168,.55)] bg-[rgba(58,34,51,.94)] px-7 py-3.5 shadow-[0_20px_50px_-18px_rgba(58,34,51,.65)] backdrop-blur-md">
+          <span className="h-1 w-1 rounded-full bg-[var(--gold)]" />
+          <span className="font-display text-[15.5px] tracking-wide text-[#F1E7D8]">{toastMsg || ''}</span>
+        </div>
+      </div>
+
+      {/* elegant confirmation */}
+      {ask && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[rgba(42,32,41,.55)] px-6 backdrop-blur-sm"
+             onClick={() => setAsk(null)}>
+          <div className="w-full max-w-[420px] overflow-hidden rounded-2xl border border-[rgba(216,199,168,.6)] bg-[var(--paper)] shadow-[0_40px_90px_-30px_rgba(42,32,41,.6)]"
+               style={{ animation: 'rise .45s cubic-bezier(.22,1,.36,1)' }}
+               onClick={(e) => e.stopPropagation()}>
+            <div className="h-px w-full gold-line" />
+            <div className="px-8 pt-8 pb-7 text-center">
+              <h3 className="font-display text-[25px] font-medium text-[var(--plum)]">{ask.title}</h3>
+              <p className="mx-auto mt-3 max-w-[320px] text-[14px] leading-relaxed text-[var(--taupe)]">{ask.body}</p>
+              <div className="mt-7 flex gap-3">
+                <button onClick={() => setAsk(null)}
+                  className="flex-1 rounded-full border border-[rgba(216,199,168,.9)] py-3 text-[11.5px] uppercase tracking-[.2em] text-[var(--taupe)] transition-all hover:border-[var(--plum)] hover:text-[var(--plum)]">
+                  Keep it
+                </button>
+                <button onClick={() => { const r = ask.run; setAsk(null); r() }}
+                  className="flex-1 rounded-full bg-[var(--plum)] py-3 text-[11.5px] uppercase tracking-[.2em] text-[#F1E7D8] transition-all hover:bg-[var(--wine)]">
+                  {ask.confirm}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
