@@ -6,6 +6,7 @@ import { advice, suggestion, buildCtx } from '@/lib/advice'
 
 const Patina = dynamic(() => import('@/components/Patina'), { ssr: false })
 const Cropper = dynamic(() => import('@/components/Cropper'), { ssr: false })
+const Refine = dynamic(() => import('@/components/Refine'), { ssr: false })
 
 const EMOJI: Record<string, string> = { Top: '👚', Bottom: '👖', Dress: '👗', Sleepwear: '🌙', Outerwear: '🧥', Shoes: '👟', Accessory: '💍' }
 const CATS = ['Top', 'Bottom', 'Dress', 'Outerwear', 'Sleepwear', 'Shoes', 'Accessory']
@@ -79,6 +80,7 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
   const [toCrop, setToCrop] = useState<File | null>(null)
+  const [toRefine, setToRefine] = useState<Blob | null>(null)
   const [phase, setPhase] = useState<'' | 'cutting' | 'uploading'>('')
   const [stage, setStage] = useState<'preparing' | 'segmenting' | 'refining' | 'framing'>('preparing')
   const [tick, setTick] = useState(0)
@@ -95,17 +97,27 @@ export default function Home() {
 
   const pickFile = (f: File) => setToCrop(f)   // always frame before cutting
   const addItem = async () => {
-    if (!file) { toast('An outfit photo is required 📸'); return }
-    if (!form.name.trim()) { toast('Give the outfit a name ✏️'); return }
+    if (!file) { toast('A photograph is required.'); return }
+    if (!form.name.trim()) { toast('Give the piece a name.'); return }
     try {
       setPhase('cutting'); setTick(0)
-      // Refined local pipeline: high-accuracy segmentation, edge clean-up,
-      // auto-trim + centre + pad. Free, precise, and watermark-free.
       const { refineOutfit } = await import('@/lib/cutout')
-      const cutout = await refineOutfit(file, { onStage: (s) => setStage(s) })
-      setPhase('uploading')
+      const cutout = await refineOutfit(file, { onStage: (st) => setStage(st) })
+      setPhase('')
+      setToRefine(cutout)                    // she reviews before it is saved
+    } catch (e) {
+      setPhase('')
+      toast('Could not process — ' + (e instanceof Error ? e.message : 'unknown'))
+    }
+  }
+
+  /* called once she is happy with the refined garment */
+  const commitItem = async (finished: Blob) => {
+    setToRefine(null)
+    setPhase('uploading')
+    try {
       const path = `items/${Date.now()}.png`
-      const { error: upErr } = await supabase.storage.from('wardrobe').upload(path, cutout, { contentType: 'image/png' })
+      const { error: upErr } = await supabase.storage.from('wardrobe').upload(path, finished, { contentType: 'image/png' })
       if (upErr) throw upErr
       const image_url = supabase.storage.from('wardrobe').getPublicUrl(path).data.publicUrl
       const { error } = await supabase.from('clothes').insert({ name: form.name.trim(), category: form.category, image_url })
@@ -114,9 +126,12 @@ export default function Home() {
       if (fileRef.current) fileRef.current.value = ''
       toast(rand(CUTE_SAVE))
       loadAll()
-    } catch (e) { toast('Oh no — ' + (e instanceof Error ? e.message : 'something slipped')) }
+    } catch (e) {
+      toast('Could not save — ' + (e instanceof Error ? e.message : 'unknown'))
+    }
     setPhase('')
   }
+
   const toggleFav = async (id: string, val: boolean) => {
     const { error } = await supabase.from('clothes').update({ is_favorite: val }).eq('id', id)
     if (error) toast('Update failed: ' + error.message); else loadAll()
@@ -261,6 +276,11 @@ export default function Home() {
   return (
     <main className="relative min-h-screen">
       <Patina />
+      {toRefine && (
+        <Refine cut={toRefine}
+          onCancel={() => { setToRefine(null); setFile(null); setPreview('') }}
+          onDone={commitItem} />
+      )}
       {toCrop && (
         <Cropper file={toCrop}
           onCancel={() => setToCrop(null)}

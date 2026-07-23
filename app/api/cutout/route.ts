@@ -8,6 +8,14 @@ export async function POST(req: NextRequest) {
   const key = process.env.PHOTOROOM_API_KEY
   if (!key) return NextResponse.json({ error: 'no_key' }, { status: 500 })
 
+  // The sandbox tier stamps a watermark on every result. Rather than ship
+  // watermarked images (or strip them, which would breach Photoroom's terms),
+  // we decline here so the client uses the local model — free, unlimited and
+  // genuinely watermark-free. Swap in a paid LIVE key to enable Photoroom.
+  if (key.startsWith('sandbox_')) {
+    return NextResponse.json({ error: 'sandbox_skipped' }, { status: 409 })
+  }
+
   const inForm = await req.formData()
   const file = inForm.get('image')
   if (!(file instanceof File)) return NextResponse.json({ error: 'no_file' }, { status: 400 })
