@@ -1,41 +1,69 @@
 @import "tailwindcss";
 
 :root {
-  /* Royal / elegant palette */
-  --bg:#F4EFE9;          /* warm ivory base */
-  --paper:#FBF8F3;       /* card surface */
-  --champagne:#EBE1D2;   /* soft champagne */
-  --sand:#D8C7A8;        /* muted gold-sand */
-  --gold:#B08D4F;        /* antique gold accent */
-  --gold-soft:#C9A86A;
-  --taupe:#8C7A63;       /* muted text */
-  --plum:#3A2233;        /* deep aubergine (primary dark) */
-  --plum-soft:#5A3A50;
-  --wine:#7A3B4E;        /* accent wine */
-  --ink:#2A2029;         /* near-black text */
-  /* legacy aliases so existing class names keep working */
-  --cream:var(--bg); --beige:var(--champagne); --cocoa:var(--plum);
-  --blush:#E7D3C0; --rose:var(--gold);
+  /* Vitiligo-inspired: two tones meeting in soft contrast.
+     Warm ground, ivory patches of light, antique gold, deep aubergine. */
+  --ground:#EFE7DB;      /* warm base skin-tone ground */
+  --light:#FBF7F0;       /* the lighter patch */
+  --paper:#FDFBF7;       /* card surface */
+  --champagne:#EDE4D6;
+  --sand:#D6C4A6;
+  --gold:#A98944;        /* antique gold */
+  --gold-soft:#C2A468;
+  --taupe:#877560;
+  --plum:#33202F;        /* deep aubergine */
+  --wine:#733B4C;
+  --ink:#241C23;
+  /* legacy aliases */
+  --bg:var(--ground); --cream:var(--ground); --beige:var(--champagne);
+  --cocoa:var(--plum); --blush:#E5D2C1; --rose:var(--gold);
 }
-html { scroll-behavior:smooth }
+
+html { scroll-behavior:smooth; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility }
+
 body {
   color:var(--ink);
   font-family:'Jost', sans-serif;
   font-weight:300;
+  font-size:16px;
+  line-height:1.65;
+  letter-spacing:.005em;
   background:
-    radial-gradient(1200px 600px at 15% -10%, #EFE6D8 0%, transparent 60%),
-    radial-gradient(1000px 700px at 100% 0%, #EAD9DE 0%, transparent 55%),
-    linear-gradient(180deg, #F4EFE9 0%, #EFE7DC 100%);
+    radial-gradient(900px 500px at 12% -8%, var(--light) 0%, transparent 62%),
+    radial-gradient(800px 600px at 92% 4%, #F2E9E4 0%, transparent 58%),
+    linear-gradient(180deg, var(--ground) 0%, #EAE0D2 100%);
   background-attachment:fixed;
   min-height:100vh;
 }
-.font-display { font-family:'Cormorant Garamond', serif; letter-spacing:.005em }
-.card-shadow { box-shadow:0 10px 30px -14px rgba(58,34,51,.20) }
-.card-shadow-lg { box-shadow:0 26px 60px -22px rgba(58,34,51,.30) }
-/* thin gold hairline used on cards / dividers */
+
+/* ---- typographic scale: deliberate, not default ---- */
+.font-display { font-family:'Cormorant Garamond', serif; letter-spacing:0 }
+h1,h2,h3,h4 { font-family:'Cormorant Garamond', serif; font-weight:500; line-height:1.12 }
+.eyebrow {
+  font-size:11px; letter-spacing:.34em; text-transform:uppercase;
+  color:var(--gold); font-weight:400;
+}
+.meta {
+  font-size:10.5px; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--taupe); font-weight:400;
+}
+.body-lg { font-size:17px; line-height:1.75; color:var(--taupe) }
+
+/* ---- surfaces ---- */
+.card-shadow { box-shadow:0 12px 34px -18px rgba(51,32,47,.22) }
+.card-shadow-lg { box-shadow:0 34px 70px -28px rgba(51,32,47,.32) }
 .gold-line { background:linear-gradient(90deg, transparent, var(--gold-soft), transparent) }
-@keyframes rise { from {opacity:0; transform:translateY(18px)} to {opacity:1; transform:none} }
-.rise { animation: rise .6s cubic-bezier(.22,1,.36,1) }
-@keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:.35} }
-.live-dot::before { content:''; width:7px; height:7px; border-radius:9999px; background:var(--gold); display:inline-block; margin-right:6px; animation:pulse2 2s infinite }
+
+/* ---- motion ---- */
+@keyframes rise { from {opacity:0; transform:translateY(20px)} to {opacity:1; transform:none} }
+.rise { animation: rise .7s cubic-bezier(.22,1,.36,1) }
+@keyframes breathe { 0%,100%{opacity:.55} 50%{opacity:1} }
+.live-dot::before {
+  content:''; width:5px; height:5px; border-radius:9999px; background:var(--gold);
+  display:inline-block; margin-right:8px; animation:breathe 3.2s ease-in-out infinite;
+}
+/* elegant indeterminate bar for loading */
+@keyframes sweep { 0%{transform:translateX(-100%)} 100%{transform:translateX(300%)} }
+.sweep { animation: sweep 1.9s cubic-bezier(.5,0,.3,1) infinite }
+
 @media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important} }

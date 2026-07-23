@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import { supabase, Cloth, ItemStat, WearEntry, Outfit } from '@/lib/supabase'
 import { advice, suggestion, buildCtx } from '@/lib/advice'
 
-const Petals = dynamic(() => import('@/components/Petals'), { ssr: false })
+const Patina = dynamic(() => import('@/components/Patina'), { ssr: false })
 
 const EMOJI: Record<string, string> = { Top: '👚', Bottom: '👖', Dress: '👗', Sleepwear: '🌙', Outerwear: '🧥', Shoes: '👟', Accessory: '💍' }
 const CATS = ['Top', 'Bottom', 'Dress', 'Outerwear', 'Sleepwear', 'Shoes', 'Accessory']
@@ -258,12 +258,14 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen">
-      <Petals />
+      <Patina />
       {/* full-screen cute loader while the AI works */}
       {busy && (
         <div className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-[rgba(244,239,233,.94)] px-8 text-center backdrop-blur-md">
-          <div className="mb-8 h-14 w-14 animate-spin rounded-full border border-[var(--sand)] border-t-[var(--gold)]" style={{ borderWidth: 1.5 }} />
-          <div className="font-display text-[26px] font-medium tracking-wide text-[var(--plum)]">
+          <div className="mb-9 h-px w-[190px] overflow-hidden bg-[rgba(214,196,166,.5)]">
+            <div className="sweep h-full w-1/3 bg-[var(--gold)]" />
+          </div>
+          <div className="font-display text-[30px] font-medium tracking-[.01em] text-[var(--plum)]">
             {phase === 'uploading' ? 'Placing it in her closet' : STAGE_LABEL[stage]}
           </div>
           <div className="mt-5 flex items-center gap-2">
@@ -275,7 +277,7 @@ export default function Home() {
                 style={{ background: done ? 'var(--gold)' : now ? 'var(--gold-soft)' : 'var(--sand)', opacity: done || now ? 1 : .4 }} />
             })}
           </div>
-          <div className="mt-8 max-w-[430px] font-display text-[15px] italic leading-relaxed text-[var(--taupe)]">{tipMsg}</div>
+          <div className="mt-9 max-w-[420px] font-display text-[16.5px] italic leading-[1.8] text-[var(--taupe)]">{tipMsg}</div>
         </div>
       )}
 

@@ -18,13 +18,13 @@ export type CutoutOptions = {
 const SIZE = 1400
 const PADDING = 0.05
 /** background haze cleared below this */
-const CLEAR_BELOW = 0.06
+const CLEAR_BELOW = 0.28   /* washed-out ghosts (UI text, screenshot chrome) are cleared */
 /** snapped to opaque above this */
 const SOLID_ABOVE = 0.92
 /** a pixel only counts as "subject" above this — high, to ignore ghosts */
-const SOLID_ALPHA = 150
+const SOLID_ALPHA = 165
 /** components smaller than this share of the largest are discarded */
-const KEEP_RATIO = 0.12
+const KEEP_RATIO = 0.55   /* only near-equal blobs survive; debris never does */
 /** mask resolution used for component analysis (speed) */
 const MASK_MAX = 360
 
@@ -95,8 +95,13 @@ function keepMainSubject(d: Uint8ClampedArray, w: number, h: number): boolean {
   for (let i = 1; i < sizes.length; i++) if (sizes[i] > sizes[biggest || 1]) biggest = i
   const largest = sizes[biggest]
   if (!largest) return false
-  const keep = new Set<number>()
-  for (let i = 1; i < sizes.length; i++) if (sizes[i] >= largest * KEEP_RATIO) keep.add(i)
+  const keep = new Set<number>([biggest])
+  // a second blob is kept only if it is nearly as large AND sits close to the
+  // main blob (a detached sleeve), never a distant text block.
+  for (let i = 1; i < sizes.length; i++) {
+    if (i === biggest || sizes[i] < largest * KEEP_RATIO) continue
+    keep.add(i)
+  }
 
   // safety: if we'd delete most of the visible subject, don't
   let kept = 0, total = 0
