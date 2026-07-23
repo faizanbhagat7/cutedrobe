@@ -5,6 +5,7 @@ import { supabase, Cloth, ItemStat, WearEntry, Outfit } from '@/lib/supabase'
 import { advice, suggestion, buildCtx } from '@/lib/advice'
 
 const Patina = dynamic(() => import('@/components/Patina'), { ssr: false })
+const Cropper = dynamic(() => import('@/components/Cropper'), { ssr: false })
 
 const EMOJI: Record<string, string> = { Top: '👚', Bottom: '👖', Dress: '👗', Sleepwear: '🌙', Outerwear: '🧥', Shoes: '👟', Accessory: '💍' }
 const CATS = ['Top', 'Bottom', 'Dress', 'Outerwear', 'Sleepwear', 'Shoes', 'Accessory']
@@ -77,6 +78,7 @@ export default function Home() {
   const [form, setForm] = useState({ name: '', category: 'Top' })
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
+  const [toCrop, setToCrop] = useState<File | null>(null)
   const [phase, setPhase] = useState<'' | 'cutting' | 'uploading'>('')
   const [stage, setStage] = useState<'preparing' | 'segmenting' | 'refining' | 'framing'>('preparing')
   const [tick, setTick] = useState(0)
@@ -91,7 +93,7 @@ export default function Home() {
   
   const tipMsg = useMemo(() => advice(adviceCtx), [tick, adviceCtx])
 
-  const pickFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)) }
+  const pickFile = (f: File) => setToCrop(f)   // always frame before cutting
   const addItem = async () => {
     if (!file) { toast('An outfit photo is required 📸'); return }
     if (!form.name.trim()) { toast('Give the outfit a name ✏️'); return }
@@ -259,6 +261,11 @@ export default function Home() {
   return (
     <main className="relative min-h-screen">
       <Patina />
+      {toCrop && (
+        <Cropper file={toCrop}
+          onCancel={() => setToCrop(null)}
+          onConfirm={(cropped) => { setFile(cropped); setPreview(URL.createObjectURL(cropped)); setToCrop(null); toast('Framed. Ready when you are.') }} />
+      )}
       {/* full-screen cute loader while the AI works */}
       {busy && (
         <div className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-[rgba(244,239,233,.94)] px-8 text-center backdrop-blur-md">
@@ -324,8 +331,12 @@ export default function Home() {
                 <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) pickFile(f) }} />
                 <div onClick={() => !busy && fileRef.current?.click()}
                   className="flex aspect-[3/4] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-[1.5px] border-dashed border-[var(--sand)] bg-[#F3ECDF] text-center transition-colors hover:border-[var(--rose)]">
-                  {preview ? <img src={preview} alt="outfit" className="h-full w-full object-cover" />
-                    : <div className="px-4 text-[var(--taupe)]"><div className="mb-2 text-4xl">📸</div><div className="font-display text-[18px] font-semibold text-[var(--cocoa)]">Upload outfit photo</div><div className="text-[13px]">required · AI keeps just the outfit</div></div>}
+                  {preview ? <img src={preview} alt="outfit" className="h-full w-full object-contain p-3" />
+                    : <div className="px-6 text-[var(--taupe)]">
+                        <div className="mx-auto mb-3 h-9 w-9 rounded-full border border-[var(--sand)]" />
+                        <div className="font-display text-[19px] text-[var(--plum)]">Add a photograph</div>
+                        <div className="meta mt-2">frame it · then we lift the garment</div>
+                      </div>}
                 </div>
               </div>
               <div className="flex flex-col justify-center gap-4">

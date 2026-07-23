@@ -19,10 +19,10 @@ export default function Patina() {
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
     let raf = 0, w = 0, h = 0, t = 0
 
-    const patches: Patch[] = Array.from({ length: 9 }, (_, i) => ({
+    const patches: Patch[] = Array.from({ length: 14 }, (_, i) => ({
       x: (i * 0.37 + 0.1) % 1,
       y: (i * 0.53 + 0.05) % 1,
-      r: 0.12 + ((i * 7) % 10) / 42,
+      r: 0.16 + ((i * 7) % 10) / 26,
       seed: i * 1.7,
       drift: 0.00006 + ((i * 3) % 5) / 90000,
       tone: i % 3,
@@ -55,10 +55,11 @@ export default function Patina() {
       ctx.closePath()
     }
 
+    /* clearly visible two-tone contrast: light patches on warm ground */
     const TONES = [
-      'rgba(255,253,248,0.55)',  // ivory light patch
-      'rgba(247,240,229,0.45)',  // pale champagne
-      'rgba(214,196,166,0.20)',  // faint gold shadow
+      'rgba(255,252,246,0.92)',  // ivory depigmented patch — the light
+      'rgba(252,247,238,0.80)',  // softer ivory
+      'rgba(214,190,150,0.28)',  // warm ground shadow, defines the edge
     ]
 
     const draw = () => {
@@ -70,10 +71,15 @@ export default function Patina() {
         const cy = ((p.y + (reduce ? 0 : t * p.drift * 900)) % 1.2 - 0.1) * h
         const r = p.r * base
         ctx.save()
-        ctx.filter = 'blur(26px)'
+        ctx.filter = 'blur(14px)'
         ctx.fillStyle = TONES[p.tone]
         blob(cx, cy, r, p.seed, t)
         ctx.fill()
+        if (p.tone !== 2) {
+          ctx.strokeStyle = 'rgba(206,182,142,0.30)'
+          ctx.lineWidth = 2
+          ctx.stroke()
+        }
         ctx.restore()
       }
       raf = requestAnimationFrame(draw)
